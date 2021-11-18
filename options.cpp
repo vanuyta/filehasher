@@ -13,7 +13,7 @@ namespace x3 = boost::spirit::x3;
 const char *about = 
 "About:\n"\
 "  Splits input file in blocks with specified size and calculate their hashes.\n"\
-"  Writes generated chain of hashes to output file or stdout.\n"\
+"  Writes generated chain of hashes to specified output file or stdout.\n"\
 "  Author: 'Ivan Pankov' (ivan.a.pankov@gmail.com) nov. 2021\n"\
 "Usage:\n"\
 "  filehasher [options] <PATH TO FILE> \n"\
@@ -58,9 +58,9 @@ static const po::options_description get_options() {
             ("infile,i", po::value<std::string>()->value_name("PATH"), "Path to the file to be processed.")
             ("outfile,o", po::value<std::string>()->value_name("PATH"), "Path to the file to write results (`stdout` if not specified).")
             ("workers,w", po::value<size_t>()->default_value(def_workers)->value_name("NUM"), "Number of workers to calculate hashes (number of H/W threads supported - if not specified).")
-            ("blocksize,b", po::value<std::string>()->default_value("1M")->value_name("SIZE"), "Size of block. Scale suffixes are allowed:\n`K` - Means Kbyte(example 128K)\n`M` - Means Mbyte (example 10M)")
-            ("ordered", "Ennables results ordering by chunk number.\nOrdering option has restriction in 100000 chunks. Unordered output is faster and uses less momory.")
-            ("mapping", "Ennables `mmap` option instead of stream reading. Could be faster and does not usess phisical RAM memmory to store chunks.\nOn Win x86 will definitely fail with files more than 2GB.");
+            ("blocksize,b", po::value<std::string>()->default_value("1M")->value_name("SIZE"), "Size of block. Scale suffixes are allowed:\n`K` - mean Kbyte(example 128K)\n`M` - mean Mbyte (example 10M)")
+            ("ordered", "Ennables results ordering by chunk number.\nOrdering option has restriction in 100000 chunks. Unordered output is faster and uses less memory.")
+            ("mapping", "Ennables `mmap` option instead of stream reading. Could be faster and does not usess physical RAM memory to store chunks.\nOn Win x86 will definitely fail with files more than 2GB.");
     }
 
     return options;
