@@ -59,8 +59,8 @@ hasher& hasher::operator=(const hasher& rhs) {
     return *this;
 }
 
-hasher::hasher(hasher&& lhs) = default;
-hasher& hasher::operator=(hasher&& lhs) = default;
+hasher::hasher(hasher&& lhs) noexcept = default;
+hasher& hasher::operator=(hasher&& lhs) noexcept = default;
 hasher::~hasher() = default;
 
 }//namespace filehasher

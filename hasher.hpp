@@ -19,8 +19,8 @@ public:
 
     hasher(const hasher& lhs);
     hasher& operator = (const hasher& lhs);
-    hasher(hasher&& lhs);
-    hasher& operator=(hasher&& lhs);
+    hasher(hasher&& lhs) noexcept;
+    hasher& operator=(hasher&& lhs) noexcept;
     ~hasher();
 
     struct hasher_impl;
