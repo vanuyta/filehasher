@@ -19,20 +19,20 @@ const char *about =
 "  filehasher [options] <PATH TO FILE> \n"\
 "\nOptions";
 
-static unsigned int parse_size(std::string value)
+static size_t parse_size(std::string value)
 {
-    auto count {0UL};
+    auto count = size_t{0};
     auto scale {'B'};
     auto getter = std::tie(count, scale);    
 
     if( x3::parse(value.cbegin(), value.cend(), x3::ulong_ >> -x3::char_ >> x3::eoi, getter) ) {
         switch (std::toupper(scale)) {
         case 'K':
-            if (count < ULLONG_MAX / 1024)
+            if (count < std::numeric_limits<decltype(count)>::max() / 1024)
                 return count * 1024;
             break;
         case 'M':
-            if (count < ULLONG_MAX / (1024 * 1024))
+            if (count < std::numeric_limits<decltype(count)>::max() / (1024 * 1024))
                 return count * 1024 * 1024;
             break;
         case 'B':
