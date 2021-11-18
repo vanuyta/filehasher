@@ -2,18 +2,22 @@
 #include <fstream>
 #include <chrono>
 #include <set>
+#include <filesystem>
 #include <boost/interprocess/managed_mapped_file.hpp>
 
+#include "commondefs.hpp"
 #include "options.hpp"
 #include "threading.hpp"
 
 using namespace filehasher;
 
+// Defines hash calculation result, that contains chank number in file and its hash value.
 struct result_t {
     size_t      cunk_number;
     std::string hash;
 };
 
+// As ordered result is allowed - specify 'std::less' to make it possible to store results in ordered containers.
 namespace std {
     template<> struct less<result_t>
     {
@@ -24,48 +28,53 @@ namespace std {
     };
 }
 
+// Type of function that can be used to process result.
+// Currently to options exists:
+//  - process results 'on the flygth'  (results will be directly written to output)
+//  - process oredered results (accumulate, sort, write at the and).
 using resulter_function_t = std::function<void(result_t&& r)>;
 
-static void do_with_streaming(filehasher::Options opts, hash_function_t hfunc, const resulter_function_t& rfunc) {
+static void do_with_streaming(Options opts, hasher hash, const resulter_function_t& rfunc) {
     struct job_t {
         size_t              chunk_number{0};
         std::vector<char>   chank;
     };
 
     piped_workers_pool<job_t, result_t>
-    workers (opts.Workers, [hfunc](job_t&& job) {
-        return result_t{job.chunk_number, hfunc(job.chank.data(), job.chank.size())};
+    workers (opts.Workers, opts.QueueSize, [hash](job_t&& job) mutable {
+        hash.process_bytes(job.chank.data(), job.chank.size());
+        return result_t{job.chunk_number, hash.result()};
     });
     
     piped_workers_pool<result_t>
-    resulter (1, workers, [&rfunc](result_t&& result) {
+    resulter (1, opts.QueueSize, workers, [&rfunc](result_t&& result) {
         rfunc(std::move(result));
     });
 
-    auto& input = workers.get_input_chan();
-    auto& terminator = resulter.get_output_chan();
+    auto input = workers.get_input_chan();
+    auto terminator = resulter.get_output_chan();
 
     std::ifstream ifile(opts.InputFile, std::ifstream::binary);
     if(!ifile)
         throw error("failed to open file [" + opts.InputFile + "]");
 
-    for (size_t i=0; ifile && !terminator.is_closed(); i++) {
-        std::vector<char> buff(opts.BloclSize);
+    for (size_t i=0; ifile && !terminator->is_closed(); i++) {
+        std::vector<char> buff(opts.BlockSize);
         ifile.read(buff.data(), buff.size());
         size_t readed = ifile.gcount();
         if(readed == 0)
             break;
         buff.resize(readed);
-        if (input.push(std::move(job_t{i, std::move(buff)})) != boost::fibers::channel_op_status::success)
+        if (!input->push(std::move(job_t{i, std::move(buff)})))
             break;
     }
 
-    input.close();
+    input->close();
     workers.wait();
     resulter.wait();
 }
 
-static void do_with_mapping(filehasher::Options opts, const hash_function_t& hfunc, const resulter_function_t& rfunc) {
+static void do_with_mapping(filehasher::Options opts, hasher& hash, const resulter_function_t& rfunc) {
     namespace bi = boost::interprocess;
     struct job_t {
         size_t      chunk_number    {0};
@@ -74,30 +83,31 @@ static void do_with_mapping(filehasher::Options opts, const hash_function_t& hfu
     };
 
     piped_workers_pool<job_t, result_t>
-    workers (opts.Workers, [&hfunc](const job_t& job) {
-        return result_t{job.chunk_number, hfunc(job.addr, job.size)};
+    workers (opts.Workers, opts.QueueSize, [&hash](const job_t& job) {
+        hash.process_bytes(job.addr, job.size);
+        return result_t{job.chunk_number, hash.result()};
     });
     
     piped_workers_pool<result_t>
-    resulter (1, workers, [&rfunc](result_t&& result){
+    resulter (1, opts.QueueSize, workers, [&rfunc](result_t&& result){
         rfunc(std::move(result));
     });
 
     try {
-        auto& input = workers.get_input_chan();
-        auto& terminator = resulter.get_output_chan();
+        auto input = workers.get_input_chan();
+        auto terminator = resulter.get_output_chan();
     
         bi::file_mapping ifile(opts.InputFile.c_str(), bi::read_only);
         bi::mapped_region region(ifile, bi::read_only);
 
         size_t size = region.get_size();
         const void* addr = region.get_address();
-        for (size_t i = 0, num = 0; i < size && !terminator.is_closed(); i += opts.BloclSize) {
-            if(input.push(job_t{num++,std::min((size_t)opts.BloclSize, size - i), (const char*)addr + i}) != boost::fibers::channel_op_status::success)
+        for (size_t i = 0, num = 0; i < size && !terminator->is_closed(); i += opts.BlockSize) {
+            if(!input->push(job_t{num++,std::min((size_t)opts.BlockSize, size - i), (const char*)addr + i}))
                 break;
         }
 
-        input.close();
+        input->close();
         workers.wait();
         resulter.wait();
     } catch (const bi::interprocess_exception& e) {
@@ -105,19 +115,16 @@ static void do_with_mapping(filehasher::Options opts, const hash_function_t& hfu
     }
 }
 
+// Store results to provided container (will be ordered).
+// Results will be written at the and of execution.
 void process_ordered_results(result_t&& result, std::multiset<result_t>& dst) {
-    // Dummy limit for result set...
-    // In some cases (when we process 10GB file by 10B chunks for example) - it will fails.
-    // This cam be fixed with "external" sorting implementation. But it will involeves more I/O operations
-    static const size_t results_limit = 100000;
-
     if(dst.size() >= results_limit)
         throw error("too many results (try unordered output)");
     dst.insert(std::move(result));
 }
 
+// Just write unordered chunks directly to provided output stream...
 void process_unordered_results(result_t&& result, std::ostream& dst) {
-    // Just write unordered chunks directly to provided output stream...
     dst << result.cunk_number << ": " << result.hash << std::endl;
 }
 
@@ -133,10 +140,6 @@ int main(int argc, char *argv[]) {
             WriteUsage(std::cout);
             return 0;
         }
-
-        // Get hashing function (only CRC16 with Boost implementation is supported).
-        auto hfunc = GetHashFunction(opts);
-        if(!hfunc) throw error("failed to determine hash algorithm");
 
         // Select output stream depending on 'OutputFile' options flag.
         std::ofstream ofile;
@@ -155,14 +158,32 @@ int main(int argc, char *argv[]) {
             rfunc = [&output](result_t&& r) { process_unordered_results(std::move(r), output);};
         }
 
+        // Get hashing function (only CRC16 with Boost implementation is supported).
+        auto hash = GetHasher(opts);
+
+        // Adjust workers count dending on file (we dont need more workers than count of blocks to be processed).
+        size_t fsize{0};
+        try {
+            fsize = std::filesystem::file_size(opts.InputFile);
+            opts.Workers = std::min(opts.Workers, (fsize/opts.BlockSize) + (fsize%opts.BlockSize ? 1 : 0));
+        } catch(const std::filesystem::filesystem_error& e) {
+            throw error("faild to get file [" + opts.InputFile + "] size: " + e.what());
+        }
+        size_t blocks_count = fsize / opts.BlockSize + (fsize % opts.BlockSize ? 1 : 0);
+        opts.Workers = std::min(opts.Workers, blocks_count);
+
+        // Check memory limits and calculate queue size.
+        // For mapping mode - use max queue size (blocks will not occupie phisical RAM).
+        opts.QueueSize = opts.Mapping ?  queue_limit : std::min(soft_memmory_limit / opts.BlockSize, queue_limit);
+
         std::cout << "Running..." << std::endl;
         auto stime = std::chrono::high_resolution_clock::now();
 
         // Select input file reading mode (streamed/maped) depending on 'Mapping' options flag.
         if(opts.Mapping)
-            do_with_mapping(opts, hfunc, rfunc);
-        else 
-            do_with_streaming(opts, hfunc, rfunc);
+            do_with_mapping(opts, hash, rfunc);
+        else
+            do_with_streaming(opts, hash, rfunc);
 
         // If orderd output was selected - flush it.
         if (opts.Sorted) {

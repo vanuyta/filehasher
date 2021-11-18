@@ -57,4 +57,4 @@ void thread_group::do_launch(std::packaged_task<void()>&& task) {
     pimp->do_launch(std::move(task));
 }
 
-} // namespace filehasher
+}// namespace filehasher

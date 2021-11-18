@@ -4,7 +4,8 @@
 #include <string>
 #include <stdexcept>
 
-#include "misc.hpp"
+#include "commondefs.hpp"
+#include "hasher.hpp"
 
 namespace filehasher {
 
@@ -20,7 +21,7 @@ namespace filehasher {
         Command         Cmd         {Command::run};
         std::string     InputFile;
         std::string     OutputFile; 
-        size_t          BloclSize   {0};
+        size_t          BlockSize   {0};
         size_t          Workers     {1};
         HashType        Hash        {HashType::crc16};
         bool            Sorted      {false};
@@ -30,6 +31,9 @@ namespace filehasher {
 
     Options ParseCommandLine(int argc, char *argv[]);
     void WriteUsage(std::ostream& os);
-    hash_function_t GetHashFunction(const Options& opts);
-};
+
+    hasher GetHasher(const Options& opts);
+
+}//namespace filehasher
+
 #endif//FILEHASHER_OPTIONS_HPP

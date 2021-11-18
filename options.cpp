@@ -6,12 +6,11 @@
 #include <boost/fusion/adapted/std_tuple.hpp>
 
 #include "options.hpp"
-#include "threading.hpp"
 
 namespace po = boost::program_options;
 namespace x3 = boost::spirit::x3;
 
-static const char *about = 
+const char *about = 
 "About:\n"\
 "  Splits input file in blocks with specified size and calculate their hashes.\n"\
 "  Writes generated chain of hashes to output file or stdout.\n"\
@@ -60,7 +59,6 @@ static const po::options_description get_options() {
             ("outfile,o", po::value<std::string>()->value_name("PATH"), "Path to the file to write results (`stdout` if not specified).")
             ("workers,w", po::value<size_t>()->default_value(def_workers)->value_name("NUM"), "Number of workers to calculate hashes (number of H/W threads supported - if not specified).")
             ("blocksize,b", po::value<std::string>()->default_value("1M")->value_name("SIZE"), "Size of block. Scale suffixes are allowed:\n`K` - Means Kbyte(example 128K)\n`M` - Means Mbyte (example 10M)")
-            ("queuesize,q", po::value<size_t>()->value_name("COUNT"), "Maximum count of blocks waiting to be processed. By default it is calculated using 'blocksize' to fit waiting blocks in 1GB of RAM.")
             ("ordered", "Ennables results ordering by chunk number.\nOrdering option has restriction in 100000 chunks. Unordered output is faster and uses less momory.")
             ("mapping", "Ennables `mmap` option instead of stream reading. Could be faster and does not usess phisical RAM memmory to store chunks.\nOn Win x86 will definitely fail with files more than 2GB.");
     }
@@ -88,27 +86,24 @@ namespace filehasher {
             opts.Cmd = Command::run;
             if(!vm.count("infile"))
                 throw po::validation_error{po::validation_error::at_least_one_value_required, "infile"};
-            
             opts.InputFile = vm["infile"].as<std::string>();
-            opts.Workers = vm["workers"].as<size_t>();
-            opts.BloclSize = parse_size(vm["blocksize"].as<std::string>());
-            size_t fsize = std::filesystem::file_size(opts.InputFile);
-            opts.Workers = std::min(opts.Workers, (fsize/opts.BloclSize) + (fsize%opts.BloclSize ? 1 : 0));
 
-            if(opts.BloclSize == 0)
+            opts.Workers = vm["workers"].as<size_t>();
+            if(opts.Workers == 0)
+                throw po::validation_error{po::validation_error::invalid_option_value, "workers"};
+
+            opts.BlockSize = parse_size(vm["blocksize"].as<std::string>());
+            if(opts.BlockSize == 0)
                 throw po::validation_error{po::validation_error::invalid_option_value, "blocksize"};
+
             if(vm.count("outfile"))
                 opts.OutputFile = vm["outfile"].as<std::string>();
+
             if(vm.count("ordered"))
                 opts.Sorted = true;
+
             if(vm.count("mapping"))
                 opts.Mapping = true;
-
-            if(vm.count("queuesize"))
-                opts.QueueSize = vm["workers"].as<size_t>();
-            else 
-                opts.QueueSize = std::min((1024 * 1024 * 1024) / opts.BloclSize, (filehasher::max_queue - 1));
-            // std::cout << "Block " << opts.BloclSize << " Workers " << opts.Workers << " Queue " << opts.QueueSize;
 
         } catch (const po::error& e){
             throw options_error(e.what());
@@ -120,8 +115,9 @@ namespace filehasher {
         os << get_options();
     }
 
-    hash_function_t GetHashFunction(const Options& opts) {
-        return hash_crc16;
+    hasher GetHasher(const Options& opts) {
+        //Only CRC16 is implemented.
+        return hasher{hasher::hash_types::crc_16};
     }
 
-}
+}//namespace filehasher
