@@ -34,6 +34,10 @@ namespace std {
 //  - process oredered results (accumulate, sort, write at the and).
 using resulter_function_t = std::function<void(result_t&& r)>;
 
+
+// Do the work using stream reading from input file.
+// Producer (main thread) will reads chunks one by one and put them to the input chanel of workers pool.
+// Max memmory usage is limeted with Options.QueueSize.
 static void do_with_streaming(Options opts, hasher hash, const resulter_function_t& rfunc) {
     struct job_t {
         size_t              chunk_number{0};
@@ -51,7 +55,12 @@ static void do_with_streaming(Options opts, hasher hash, const resulter_function
         rfunc(std::move(result));
     });
 
+    // input - entry point to the pipe of worker pools.
+    // All jobs should be written in it.
     auto input = workers.get_input_chan();
+
+    // terminator - is the last chanel in the pipe.
+    // If it is closed before all the job is done - something wrong happend. Producer should break and "wait" waorkers to get exception.
     auto terminator = resulter.get_output_chan();
 
     std::ifstream ifile(opts.InputFile, std::ifstream::binary);
@@ -69,11 +78,15 @@ static void do_with_streaming(Options opts, hasher hash, const resulter_function
             break;
     }
 
+    // Any exceptions from workers will be raised here
     input->close();
     workers.wait();
     resulter.wait();
 }
 
+// Do the work using "mmap" aproach.
+// Producer (main thread) will map whole file to virtual memmory and pushh memmory segments to input chanel of workers pool.
+// No need to limit memmory usage. Options.QueueSize has its maximum value.
 static void do_with_mapping(filehasher::Options opts, hasher& hash, const resulter_function_t& rfunc) {
     namespace bi = boost::interprocess;
     struct job_t {
@@ -94,7 +107,12 @@ static void do_with_mapping(filehasher::Options opts, hasher& hash, const result
     });
 
     try {
+        // input - entry point to the pipe of worker pools.
+        // All jobs should be written in it.
         auto input = workers.get_input_chan();
+
+        // terminator - is the last chanel in the pipe.
+        // If it is closed before all the job is done - something wrong happend. Producer should break and "wait" waorkers to get exception.
         auto terminator = resulter.get_output_chan();
     
         bi::file_mapping ifile(opts.InputFile.c_str(), bi::read_only);
@@ -107,6 +125,7 @@ static void do_with_mapping(filehasher::Options opts, hasher& hash, const result
                 break;
         }
 
+        // Any exceptions from workers will be raised here
         input->close();
         workers.wait();
         resulter.wait();

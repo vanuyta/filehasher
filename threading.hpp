@@ -35,6 +35,8 @@ private:
     void do_launch(std::packaged_task<void()>&& task);
 };
 
+// Chanel implementation
+// Replaces boost::fibers::chanels (used before) becouse it does not allow to set exact chnel capacity.
 template<class T>
 class chanel {
     static_assert(std::is_move_constructible_v<T>);
@@ -102,6 +104,10 @@ template <bool> struct nanness {};
 using nan_tag = nanness<true>;
 using not_nan_tag = nanness<false>;
 
+// Helps to manage pipe with input chanel, pool of workers and output chanels.
+// If any exception will be raised by one of workers - both input and autput chanel will be closed and all pool will be stoped as soon as possible.
+// Raised exception will be rethrown in "wait()" method.
+// Two piped_workers_pool can be connected to each other with output chanel of first one and input chanel of second.
 template<class J, class R = nan_value>
 struct piped_workers_pool {
     static_assert(std::is_move_constructible_v<R>);
@@ -121,7 +127,10 @@ public:
         static_assert(std::is_same_v<std::invoke_result_t<W,J>, R>);
         run(nworkers, std::forward<W>(worker));
     }
-
+    
+    // Constructor that "connects" two pools with their output -> input chanels
+    // Will not write any value to output chanel, just checks if it closed or not - to make decision to stop working.
+    // Implemented to allow void(Arg..) workers.
     template<class Unused, class W>
     piped_workers_pool(size_t nworkers, size_t nqueue, piped_workers_pool<Unused, J>& source, W&& worker)
         : input(source.output), output(std::make_shared<chanel<R>>(nqueue))
@@ -165,6 +174,9 @@ private:
         }
     }
 
+    // Special overload for terminating (last) workers pool.
+    // Will not write any value to output chanel, just checks if it closed or not - to make decision to stop working.
+    // Implemented to allow void(Arg..) workers.
     template <class F>
     bool call_and_pipe(F& func, J&& p, chanel<R>& out, nan_tag ) {
         func(std::move(p));
