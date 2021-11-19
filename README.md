@@ -37,6 +37,7 @@ Only **Boost** was used as external dependency. `filehasher` uses:
   - Boost libraries: programm_options
 
 Initial iimplementation did also use boost::fibers (for its `chanels`). But was replaced with own implementations later.
+Was tested with **Boost 1.71** on Ubuntu and **Boost 1.77** on Windows.
 
 ### Platform.
 Compilation was tested on Windows 10 x64 (Visual Studio Build Tools 2019) and Ubuntu 20.04 running in WSL2 (GCC 9.3.0).  
