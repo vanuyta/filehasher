@@ -4,7 +4,7 @@
 namespace filehasher {
 
 struct error : public std::logic_error {
-    error(const std::string& what) : std::logic_error(what) {}
+    explicit error(const std::string& what) : std::logic_error(what) {}
 };
 
 // Dummy limit for result set...

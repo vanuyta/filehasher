@@ -43,7 +43,8 @@ hasher::hasher(hash_types) : imp(std::make_unique<hasher_crc16>())
 {}
 
 void hasher::process_bytes(const void *bytes, size_t size) {
-    imp->process_bytes(bytes, size);
+    if (bytes != nullptr && size != 0)
+        imp->process_bytes(bytes, size);
 }
 
 std::string hasher::result(){

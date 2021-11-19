@@ -10,7 +10,7 @@
 namespace filehasher {
 
     struct options_error : public error {
-        options_error(const std::string& what) : error(what) {}
+        explicit options_error(const std::string& what) : error(what) {}
     };
 
     enum class Command { help, run };

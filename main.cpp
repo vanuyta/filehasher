@@ -41,7 +41,7 @@ static void do_with_sync(Options opts, hasher hash, const resulter_function_t& r
     size_t block_num = 0;
     size_t remainder = opts.BlockSize;
     auto processor = [&] (const void *data, size_t size) {
-        while (size) {
+        while (size != 0 && data != nullptr) {
             size_t bytes_to_process = std::min(remainder, size);
             hash.process_bytes(data, bytes_to_process);
             remainder -= bytes_to_process;
