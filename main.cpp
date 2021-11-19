@@ -99,7 +99,7 @@ static void do_with_mapping(filehasher::Options opts, hasher& hash, const result
     };
 
     piped_workers_pool<job_t, result_t>
-    workers (opts.Workers, opts.QueueSize, [&hash](const job_t& job) {
+    workers (opts.Workers, opts.QueueSize, [hash](const job_t& job) mutable {
         hash.process_bytes(job.addr, job.size);
         return result_t{job.chunk_number, hash.result()};
     });
