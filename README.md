@@ -79,11 +79,11 @@ Options:
 
 ### Valgrind output.
 ```
-$ valgrind --tool=memcheck ./build/bin/filehasher -b 1m -o tmp.out ../../profindustry/moniron-most/publish/Moniron.Most.API
+$ valgrind --tool=memcheck ./build/bin/filehasher -b 1m -o tmp.out ../../somefile.bin
 ==11101== Memcheck, a memory error detector
 ==11101== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
 ==11101== Using Valgrind-3.15.0 and LibVEX; rerun with -h for copyright info
-==11101== Command: ./build/bin/filehasher -b 1m -o tmp.out ../../profindustry/moniron-most/publish/Moniron.Most.API
+==11101== Command: ./build/bin/filehasher -b 1m -o tmp.out ../../somefile.bin
 ==11101== 
 Running...
 Done [with streaming] in 1644109
