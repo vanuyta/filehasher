@@ -101,8 +101,10 @@ namespace filehasher {
                 throw po::validation_error{po::validation_error::at_least_one_value_required, "infile"};
             opts.InputFile = vm["infile"].as<std::string>();
 
-            if(!try_parse_unsigned(vm["workers"].as<std::string>(), opts.Workers))
+            auto wrks = 0UL;
+            if(!try_parse_unsigned(vm["workers"].as<std::string>(), wrks))
                 throw po::validation_error{po::validation_error::invalid_option_value, "workers"};
+            opts.Workers = wrks;
 
             opts.BlockSize = parse_size(vm["blocksize"].as<std::string>());
             if(opts.BlockSize == 0)
