@@ -120,7 +120,7 @@ namespace filehasher {
                 opts.Mapping = true;
 
             size_t fsize = std::filesystem::file_size(opts.InputFile);
-            size_t blocks_count = (fsize / opts.BlockSize) + (fsize % opts.BlockSize ? 1 : 0);
+            size_t blocks_count = (fsize / opts.BlockSize) + ((fsize % opts.BlockSize) ? 1 : 0);
             if (blocks_count == 0)
                 throw options_error("input file is empty");
 
