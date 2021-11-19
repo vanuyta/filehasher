@@ -69,7 +69,7 @@ public:
         return true;
     }
 
-    bool pop(T&& outvalue) {
+    bool pop(T& outvalue) {
         {
             std::unique_lock<std::mutex> lock{mtx};
             if(queue.empty()) {
@@ -161,7 +161,7 @@ private:
             group.launch([worker, this] () mutable {
                 try {
                     J job_to_do{};
-                    while(input->pop(std::move(job_to_do))) {
+                    while(input->pop(job_to_do)) {
                         if(!call_and_pipe(worker, std::move(job_to_do), *output, nanness<std::is_same_v<nan_value, R>>()))
                             break;
                     }
