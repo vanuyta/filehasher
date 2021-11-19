@@ -247,8 +247,6 @@ int main(int argc, char *argv[]) {
 
         auto etime = std::chrono::high_resolution_clock::now();
         std::cout << "Done [with " << (opts.Mapping ? "mapping": "streaming") << "] in " << std::chrono::duration_cast<std::chrono::microseconds>(etime-stime).count() << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    
     }catch(const options_error& e) {
         std::cout << "ERROR while parsing options: " << e.what() << std::endl;
         PromptUsage(std::cout);
