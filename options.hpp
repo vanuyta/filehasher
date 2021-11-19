@@ -13,7 +13,6 @@ namespace filehasher {
         options_error(const std::string& what) : error(what) {}
     };
 
-    enum class HashType { crc16 };
     enum class Command { help, run };
 
     class Options {
@@ -22,16 +21,15 @@ namespace filehasher {
         std::string     InputFile;
         std::string     OutputFile; 
         size_t          BlockSize   {0};
-        size_t          Workers     {1};
-        HashType        Hash        {HashType::crc16};
+        size_t          Workers     {0};
         bool            Sorted      {false};
         bool            Mapping     {false};
-        size_t          QueueSize   {1};
+        size_t          QueueSize   {0};
     };
 
     Options ParseCommandLine(int argc, char *argv[]);
     void WriteUsage(std::ostream& os);
-
+    void PromptUsage(std::ostream& os);
     hasher GetHasher(const Options& opts);
 
 }//namespace filehasher

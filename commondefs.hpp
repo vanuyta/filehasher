@@ -27,6 +27,11 @@ inline const size_t queue_limit         = 1000;
 // When using "mapping" aproach - this limit is ignored.
 inline const size_t soft_memmory_limit  = 1024 * 1024 * 1024; // 1GB
 
+// Buffer size that will be used if hash calculation process will fallback to synchronous mode.
+// This can happens when requested block size is  greater then soft_memmory_limit / 2 .
+// Or when only one block should be calculated.
+inline const size_t sync_buffer_size  = 1024 * 1024 * 10; // 10MB
+
 }//namespace filehasher
 
 #endif//FILEHASHER_COMMONDEFS_HPP

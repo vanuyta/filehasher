@@ -2,7 +2,6 @@
 #include <fstream>
 #include <chrono>
 #include <set>
-#include <filesystem>
 #include <boost/interprocess/managed_mapped_file.hpp>
 
 #include "commondefs.hpp"
@@ -34,6 +33,48 @@ namespace std {
 //  - process oredered results (accumulate, sort, write at the and).
 using resulter_function_t = std::function<void(result_t&& r)>;
 
+
+// Do the work in synchronous mode
+// This can happens when requested block size is  greater then soft_memmory_limit / 2 .
+// Or when only one block should be calculated in streaming mode.
+static void do_with_sync(Options opts, hasher hash, const resulter_function_t& rfunc) {
+    size_t block_num = 0;
+    size_t remainder = opts.BlockSize;
+    auto processor = [&] (const void *data, size_t size) {
+        while (size) {
+            size_t bytes_to_process = std::min(remainder, size);
+            hash.process_bytes(data, bytes_to_process);
+            remainder -= bytes_to_process;
+            size -= bytes_to_process;
+            data = static_cast<const char*>(data) + bytes_to_process;
+
+            if(remainder == 0) {
+                remainder = opts.BlockSize;
+                rfunc(result_t{block_num++, hash.result()});
+            }
+        }
+    };
+
+    std::ifstream ifile(opts.InputFile, std::ifstream::binary);
+    if(!ifile)
+        throw error("failed to open file [" + opts.InputFile + "]");
+
+    std::vector<char> buff(sync_buffer_size);
+    for (size_t i=0; ifile; i++) {
+        ifile.read(buff.data(), buff.size());
+
+        size_t readed = ifile.gcount();
+        if(readed != sync_buffer_size && !ifile.eof()) throw error("failed to read input file");
+        if(readed == 0) break;
+
+        processor(buff.data(), readed);
+    }
+
+    //Las (partially) calculated block
+    if (remainder != opts.BlockSize)
+        rfunc(result_t{block_num++, hash.result()});
+    
+}
 
 // Do the work using stream reading from input file.
 // Producer (main thread) will reads chunks one by one and put them to the input chanel of workers pool.
@@ -184,28 +225,17 @@ int main(int argc, char *argv[]) {
         // Get hashing function (only CRC16 with Boost implementation is supported).
         auto hash = GetHasher(opts);
 
-        // Adjust workers count dending on file (we dont need more workers than count of blocks to be processed).
-        size_t fsize{0};
-        try {
-            fsize = std::filesystem::file_size(opts.InputFile);
-            opts.Workers = std::min(opts.Workers, (fsize/opts.BlockSize) + (fsize%opts.BlockSize ? 1 : 0));
-        } catch(const std::filesystem::filesystem_error& e) {
-            throw error("faild to get file [" + opts.InputFile + "] size: " + e.what());
-        }
-        size_t blocks_count = fsize / opts.BlockSize + (fsize % opts.BlockSize ? 1 : 0);
-        opts.Workers = std::min(opts.Workers, blocks_count);
-
-        // Check memory limits and calculate queue size.
-        // For mapping mode - use max queue size (blocks will not occupie phisical RAM).
-        opts.QueueSize = opts.Mapping ?  queue_limit : std::min(soft_memmory_limit / opts.BlockSize, queue_limit);
-
-        std::cout << "Running..." << std::endl;
+        std::cout << "Running: ";
+        std::cout << "queue [" << opts.QueueSize << "], workers [" << opts.Workers << "]";
+        std::cout << "..." << std::endl;
         auto stime = std::chrono::high_resolution_clock::now();
 
         // Select input file reading mode (streamed/maped) depending on 'Mapping' options flag.
-        if(opts.Mapping)
+        if(opts.Mapping && (opts.Workers > 0))
             do_with_mapping(opts, hash, rfunc);
-        else
+        else if (opts.Workers < 1)
+            do_with_sync(opts, hash, rfunc);
+        else 
             do_with_streaming(opts, hash, rfunc);
 
         // If orderd output was selected - flush it.
@@ -221,7 +251,7 @@ int main(int argc, char *argv[]) {
     
     }catch(const options_error& e) {
         std::cout << "ERROR while parsing options: " << e.what() << std::endl;
-        WriteUsage(std::cout);
+        PromptUsage(std::cout);
         return -1;
     }catch(const error& e) {
         std::cout << "ERROR: " << e.what() << std::endl;

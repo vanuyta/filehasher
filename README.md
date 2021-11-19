@@ -45,7 +45,7 @@ CMake searches Boost libraries and headers in default locations.
 
 ### Usage.
 ```
-$ ./filehasher --help
+$ ./build/bin/filehasher --help
 About:
   Splits input file in blocks with specified size and calculate their hashes.
   Writes generated chain of hashes to specified output file or stdout.
@@ -60,9 +60,11 @@ Options:
                                 not specified).
   -w [ --workers ] NUM (=8)     Number of workers to calculate hashes (number 
                                 of H/W threads supported - if not specified).
+                                '0' value can be used to forse sync processing.
   -b [ --blocksize ] SIZE (=1M) Size of block. Scale suffixes are allowed:
                                 `K` - mean Kbyte(example 128K)
                                 `M` - mean Mbyte (example 10M)
+                                `G` - mean Gbyte (example 1G)
   --ordered                     Ennables results ordering by chunk number.
                                 Ordering option has restriction in 100000 
                                 chunks. Unordered output is faster and uses 
