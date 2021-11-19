@@ -33,8 +33,8 @@ Only one hash-algorithm is suported - **CRC16**. But new one can be introduced w
 ### Dependencies.
 Only **Boost** was used as external dependency. `filehasher` uses:
 
-  - Boost headers: spirit, format, crc
-  - Boost libraries: programm_options
+  - Boost headers: **spirit, format, crc**
+  - Boost libraries: **programm_options**
 
 Initial iimplementation did also use boost::fibers (for its `chanels`). But was replaced with own implementations later.
 Was tested with **Boost 1.71** on Ubuntu and **Boost 1.77** on Windows.
