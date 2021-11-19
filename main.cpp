@@ -71,8 +71,11 @@ static void do_with_streaming(Options opts, hasher hash, const resulter_function
         std::vector<char> buff(opts.BlockSize);
         ifile.read(buff.data(), buff.size());
         size_t readed = ifile.gcount();
+        if(readed != opts.BlockSize && !ifile.eof())
+            throw error("failed to read input file");
         if(readed == 0)
             break;
+            
         buff.resize(readed);
         if (!input->push(std::move(job_t{i, std::move(buff)})))
             break;
@@ -145,6 +148,7 @@ void process_ordered_results(result_t&& result, std::multiset<result_t>& dst) {
 // Just write unordered chunks directly to provided output stream...
 void process_unordered_results(result_t&& result, std::ostream& dst) {
     dst << result.cunk_number << ": " << result.hash << std::endl;
+    if (!dst) throw error("failed to write results");
 }
 
 int main(int argc, char *argv[]) {
