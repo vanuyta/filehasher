@@ -2,6 +2,7 @@
 #include <fstream>
 #include <chrono>
 #include <set>
+#include <memory_resource>
 #include <boost/interprocess/managed_mapped_file.hpp>
 
 #include "commondefs.hpp"
@@ -81,8 +82,8 @@ static void do_with_sync(Options opts, hasher hash, const resulter_function_t& r
 // Max memmory usage is limeted with Options.QueueSize.
 static void do_with_streaming(Options opts, hasher hash, const resulter_function_t& rfunc) {
     struct job_t {
-        size_t              chunk_number{0};
-        std::vector<char>   chank;
+        size_t                  chunk_number{0};
+        std::pmr::vector<char>  chank;
     };
 
     piped_workers_pool<job_t, result_t>
@@ -108,8 +109,10 @@ static void do_with_streaming(Options opts, hasher hash, const resulter_function
     if(!ifile)
         throw error("failed to open file [" + opts.InputFile + "]");
 
+    std::pmr::pool_options pool_opts{opts.QueueSize, opts.BlockSize};
+    auto pool = std::pmr::synchronized_pool_resource{pool_opts};
     for (size_t i=0; ifile && !terminator->is_closed(); i++) {
-        std::vector<char> buff(opts.BlockSize);
+        std::pmr::vector<char> buff(opts.BlockSize, &pool);
         ifile.read(buff.data(), buff.size());
         size_t readed = ifile.gcount();
         if(readed != opts.BlockSize && !ifile.eof())
