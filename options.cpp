@@ -1,6 +1,8 @@
 #include <thread>
 #include <filesystem>
 #include <algorithm>
+#include <optional>
+
 #include <boost/program_options.hpp>
 #include <boost/spirit/home/x3.hpp>
 #include <boost/fusion/adapted/std_tuple.hpp>
@@ -20,15 +22,16 @@ const char *about =
 "  filehasher [options] <PATH TO FILE> \n"\
 "\nOptions";
 
-static bool try_parse_unsigned(std::string value, unsigned long& dst)
+static std::optional<unsigned long> try_parse_unsigned(std::string value)
 {
-    if( x3::parse(value.cbegin(), value.cend(), x3::ulong_ >> x3::eoi, dst) ) {
-        return true;
+    unsigned long res;
+    if( x3::parse(value.cbegin(), value.cend(), x3::ulong_ >> x3::eoi, res) ) {
+        return res;
     }
-    return false;
+    return std::nullopt;
 }
 
-static size_t parse_size(std::string value)
+static std::optional<size_t> try_parse_size(std::string value)
 {
     auto count = size_t{0};
     auto scale {'B'};
@@ -54,7 +57,7 @@ static size_t parse_size(std::string value)
             break;
         }
     }
-    return 0;
+    return std::nullopt;
 }
 
 static const po::options_description get_options() {
@@ -101,12 +104,12 @@ namespace filehasher {
                 throw po::validation_error{po::validation_error::at_least_one_value_required, "infile"};
             opts.InputFile = vm["infile"].as<std::string>();
 
-            auto wrks = 0UL;
-            if(!try_parse_unsigned(vm["workers"].as<std::string>(), wrks))
+            auto wrks = try_parse_unsigned(vm["workers"].as<std::string>());
+            if (!wrks)
                 throw po::validation_error{po::validation_error::invalid_option_value, "workers"};
-            opts.Workers = wrks;
+            opts.Workers = *wrks;
 
-            opts.BlockSize = parse_size(vm["blocksize"].as<std::string>());
+            opts.BlockSize = try_parse_size(vm["blocksize"].as<std::string>()).value_or(0);
             if(opts.BlockSize == 0)
                 throw po::validation_error{po::validation_error::invalid_option_value, "blocksize"};
 
